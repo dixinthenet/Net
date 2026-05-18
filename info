@@ -1,0 +1,48 @@
+$ErrorActionPreference = "Continue"
+
+Write-Host "=== Información del binario ===" -ForegroundColor Cyan
+$exe = "C:\Users\slimb\Desktop\Tools\AV EVASION\inceptor\inceptor\srp.exe"
+$pe = [System.IO.File]::ReadAllBytes($exe)
+$peOffset = [BitConverter]::ToInt32($pe, 0x3C)
+$subsystem = [BitConverter]::ToInt16($pe, $peOffset + 0x5C)
+$machine = [BitConverter]::ToInt16($pe, $peOffset + 4)
+Write-Host "Tamaño: $($pe.Length) bytes"
+Write-Host "Machine: 0x$($machine.ToString('X4'))"  # 8664 = x64, 14C = x86
+Write-Host "Subsystem: $subsystem (2=GUI, 3=Console)"
+
+Write-Host "`n=== Información .NET ===" -ForegroundColor Cyan
+try {
+    $asm = [System.Reflection.Assembly]::ReflectionOnlyLoadFrom($exe)
+    Write-Host "Runtime: $($asm.ImageRuntimeVersion)"
+    Write-Host "FullName: $($asm.FullName)"
+    Write-Host "EntryPoint: $($asm.EntryPoint)"
+} catch {
+    Write-Host "ERROR: $_" -ForegroundColor Red
+}
+
+Write-Host "`n=== Ejecución directa ===" -ForegroundColor Cyan
+$psi = New-Object System.Diagnostics.ProcessStartInfo
+$psi.FileName = $exe
+$psi.UseShellExecute = $false
+$psi.RedirectStandardOutput = $true
+$psi.RedirectStandardError = $true
+$psi.CreateNoWindow = $true
+
+$proc = [System.Diagnostics.Process]::Start($psi)
+$proc.WaitForExit(5000)
+if (-not $proc.HasExited) { $proc.Kill() }
+
+Write-Host "ExitCode: $($proc.ExitCode) (0x$($proc.ExitCode.ToString('X8')))"
+Write-Host "STDOUT:"
+Write-Host $proc.StandardOutput.ReadToEnd()
+Write-Host "STDERR:"
+Write-Host $proc.StandardError.ReadToEnd()
+
+Write-Host "`n=== Últimos errores de aplicación ===" -ForegroundColor Cyan
+Get-EventLog -LogName Application -EntryType Error -Newest 3 -ErrorAction SilentlyContinue |
+    Where-Object { $_.Source -match "\.NET|Application Error" -and $_.TimeGenerated -gt (Get-Date).AddMinutes(-10) } |
+    ForEach-Object {
+        Write-Host "[$($_.TimeGenerated)] $($_.Source)"
+        Write-Host $_.Message.Substring(0, [Math]::Min(500, $_.Message.Length))
+        Write-Host "---"
+    }

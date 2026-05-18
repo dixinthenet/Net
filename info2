@@ -1,0 +1,52 @@
+(Get-Item "SharpReflectivePEInjection.exe").Length
+
+type "C:\Users\slimb\Desktop\Tools\AV EVASION\inceptor\inceptor\inceptor\templates\dotnet\assembly_load.cs"
+
+System.IO.File.WriteAllBytes(@"C:\Temp\dumped.bin", payload);
+file C:\Temp\dumped.bin
+
+
+
+
+
+# Tamaño del SRPI original
+$orig = "C:\Users\slimb\Desktop\Tools\AV EVASION\inceptor\inceptor\SharpReflectivePEInjection.exe"
+Write-Host "Tamaño SRPI original: $((Get-Item $orig).Length) bytes"
+
+# Verificar si SRPI original es cargable con Assembly.Load directamente
+Write-Host "`nProbando Assembly.Load del SRPI original..."
+try {
+    $bytes = [System.IO.File]::ReadAllBytes($orig)
+    Write-Host "Bytes leídos: $($bytes.Length)"
+    $asm = [System.Reflection.Assembly]::Load($bytes)
+    Write-Host "OK - Assembly.Load del original funciona"
+    Write-Host "Nombre: $($asm.FullName)"
+    Write-Host "EntryPoint: $($asm.EntryPoint)"
+} catch {
+    Write-Host "ERROR: $($_.Exception.GetType().Name)"
+    Write-Host "Mensaje: $($_.Exception.Message)"
+    if ($_.Exception.InnerException) {
+        Write-Host "Inner: $($_.Exception.InnerException.Message)"
+    }
+}
+
+# Información de tipos de manifest
+Write-Host "`nManifest module info:"
+try {
+    $asm = [System.Reflection.Assembly]::ReflectionOnlyLoadFrom($orig)
+    $mod = $asm.ManifestModule
+    Write-Host "Module name: $($mod.Name)"
+    Write-Host "MDStreamVersion: $($mod.MDStreamVersion)"
+    Write-Host "Module version ID: $($mod.ModuleVersionId)"
+    Write-Host "Custom attributes: $($asm.GetCustomAttributesData().Count)"
+    
+    # Ver si tiene strong name
+    $pubKey = $asm.GetName().GetPublicKey()
+    if ($pubKey.Length -gt 0) {
+        Write-Host "Strong-named: SÍ ($($pubKey.Length) bytes)"
+    } else {
+        Write-Host "Strong-named: NO"
+    }
+} catch {
+    Write-Host "Error en ReflectionOnly: $_"
+}

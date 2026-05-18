@@ -1,0 +1,48 @@
+Write-Host "=== Diagnóstico final ===" -ForegroundColor Cyan
+
+# 1. Arquitectura del proceso PowerShell
+Write-Host "PowerShell es 64-bit: $([Environment]::Is64BitProcess)"
+
+# 2. Runtime objetivo del SRPI
+$orig = "C:\Users\slimb\Desktop\Tools\AV EVASION\inceptor\inceptor\SharpReflectivePEInjection.exe"
+$asm = [System.Reflection.Assembly]::ReflectionOnlyLoadFrom($orig)
+Write-Host "SRPI ImageRuntimeVersion: $($asm.ImageRuntimeVersion)"
+Write-Host "SRPI ProcessorArchitecture: $($asm.GetName().ProcessorArchitecture)"
+
+# 3. CorFlags del SRPI (32BIT REQ?)
+$pe = [System.IO.File]::ReadAllBytes($orig)
+$peOffset = [BitConverter]::ToInt32($pe, 0x3C)
+# OptionalHeader is at peOffset+24, DataDirectories start at +24+96 (PE32+)
+# COM Descriptor (CLR header) está en DataDirectory[14] = offset peOffset+24+96+(14*8) = peOffset+232
+$clrHeaderRVA = [BitConverter]::ToInt32($pe, $peOffset + 232)
+Write-Host "CLR Header RVA: 0x$($clrHeaderRVA.ToString('X8'))"
+
+# Convertir RVA a offset (asumiendo sección .text en raw offset 0x200 con RVA 0x2000, típico)
+# Es más fácil leer directamente con corflags si está disponible
+$corflagsPath = "C:\Program Files (x86)\Microsoft SDKs\Windows\v10.0A\bin\NETFX 4.8 Tools\CorFlags.exe"
+if (Test-Path $corflagsPath) {
+    & $corflagsPath $orig
+} else {
+    # Buscar corflags en otros sitios
+    $found = Get-ChildItem "C:\Program Files (x86)\Microsoft SDKs\Windows" -Recurse -Filter "CorFlags.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($found) {
+        & $found.FullName $orig
+    } else {
+        Write-Host "CorFlags.exe no encontrado - instala Windows SDK para verlo"
+    }
+}
+
+
+
+python inceptor.py native SharpReflectivePEInjection.exe -o srp_donut.exe --arch x64 -t donut
+
+
+
+$asm = [System.Reflection.Assembly]::ReflectionOnlyLoadFrom("C:\Users\slimb\Desktop\Tools\AV EVASION\inceptor\inceptor\SharpReflectivePEInjection.exe")
+$asm.ImageRuntimeVersion
+$asm.GetName().ProcessorArchitecture
+
+
+
+$asm = [System.Reflection.Assembly]::ReflectionOnlyLoadFrom("C:\Users\slimb\Desktop\Tools\AV EVASION\inceptor\inceptor\SharpReflectivePEInjection.exe")
+Write-Host "ProcessorArchitecture: $($asm.GetName().ProcessorArchitecture)"

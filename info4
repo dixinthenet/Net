@@ -1,0 +1,38 @@
+# 1. Arquitectura del binario
+$pe = [System.IO.File]::ReadAllBytes("Powerpnt.exe")
+$peOffset = [BitConverter]::ToInt32($pe, 0x3C)
+$machine = [BitConverter]::ToInt16($pe, $peOffset + 4)
+Write-Host "Machine: 0x$($machine.ToString('X4'))"
+$subsystem = [BitConverter]::ToInt16($pe, $peOffset + 0x5C)
+Write-Host "Subsystem: $subsystem (2=GUI, 3=Console)"
+
+# 2. Versión exacta de Windows
+Write-Host "`nWindows version:"
+[System.Environment]::OSVersion
+(Get-CimInstance Win32_OperatingSystem).Caption
+(Get-CimInstance Win32_OperatingSystem).Version
+(Get-CimInstance Win32_OperatingSystem).BuildNumber
+
+# 3. Ejecutar con captura del error exacto
+Write-Host "`n=== Ejecutando Powerpnt.exe ==="
+$psi = New-Object System.Diagnostics.ProcessStartInfo
+$psi.FileName = "$pwd\Powerpnt.exe"
+$psi.UseShellExecute = $false
+$psi.RedirectStandardOutput = $true
+$psi.RedirectStandardError = $true
+$proc = [System.Diagnostics.Process]::Start($psi)
+$proc.WaitForExit(10000)
+if (-not $proc.HasExited) { $proc.Kill() }
+Write-Host "ExitCode: $($proc.ExitCode) (0x$($proc.ExitCode.ToString('X8')))"
+Write-Host "STDOUT: $($proc.StandardOutput.ReadToEnd())"
+Write-Host "STDERR: $($proc.StandardError.ReadToEnd())"
+
+# 4. Último evento del visor
+Write-Host "`n=== Último Application Error ==="
+Get-EventLog -LogName Application -EntryType Error -Newest 2 -ErrorAction SilentlyContinue |
+    Where-Object { $_.TimeGenerated -gt (Get-Date).AddMinutes(-5) } |
+    ForEach-Object {
+        Write-Host "[$($_.TimeGenerated)] $($_.Source)"
+        Write-Host $_.Message.Substring(0, [Math]::Min(800, $_.Message.Length))
+        Write-Host "---"
+    }

